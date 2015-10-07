@@ -8,6 +8,11 @@ import oauth2client
 from oauth2client import client
 from oauth2client import tools
 
+try:
+    import argparse
+    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+except ImportError:
+    flags = None
 
 class GoogleDriveUpload():
     def __init__(self,client_secret_file,session_file):
@@ -79,7 +84,10 @@ class GoogleDriveUpload():
             flow = client.flow_from_clientsecrets(self._client_secret_file, self._scopes)
             flow.user_agent = self._application_name
             flow.params['access_type'] = 'offline'
-            self._credentials = tools.run(flow, store)
+            if flags:
+                self._credentials = tools.run_flow(flow, store, flags)
+            else: # Needed only for compatability with Python 2.6
+                self._credentials = tools.run(flow, store)
 
         # Authorize with HTTP
         self._http = self._credentials.authorize(httplib2.Http())
