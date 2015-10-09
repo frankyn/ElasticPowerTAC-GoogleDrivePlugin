@@ -4,6 +4,7 @@ import os
 
 from apiclient import discovery
 from apiclient.http import MediaFileUpload
+from apiclient.http import MediaIoBaseDownload
 import oauth2client
 from oauth2client import client
 from oauth2client import tools
@@ -14,7 +15,7 @@ try:
 except ImportError:
     flags = None
 
-class GoogleDriveUpload():
+class GoogleDriveAPIWrapper():
     def __init__(self,client_secret_file,session_file):
         self._application_name = 'ElasticPowerTAC'
         self._client_secret_file = client_secret_file
@@ -22,6 +23,35 @@ class GoogleDriveUpload():
         self._scopes = ['https://www.googleapis.com/auth/drive']
         self._service = None
         self.auth_credentials()
+
+
+    def download_file(self,file_id, file_name):
+        """Download a Drive file's content to the local filesystem.
+
+            Args:
+            service: Drive API Service instance.
+            file_id: ID of the Drive file that will downloaded.
+            file_name: used as name for to write content in.
+        """
+        fd = open(file_name,'w+')
+        request = self._service.files().get_media(fileId=file_id)
+        media_request = MediaIoBaseDownload(fd, request)
+
+        while True:
+            try:
+                download_progress, done = media_request.next_chunk()
+            except:
+                print('An error occurred')
+                fd.close()
+                return
+            if download_progress:
+                print('Download Progress: %d%%' % int(download_progress.progress() * 100))
+            if done:
+                print('Download Complete')
+                fd.close()
+                return
+
+
 
     def insert_file(self, title, description, parent_id, mime_type, filename):
         """Insert new file.
@@ -36,8 +66,7 @@ class GoogleDriveUpload():
         Returns:
         Inserted file metadata if successful, None otherwise.
         """
-        # Setup Service in order to upload file
-        self._service = discovery.build('drive', 'v2', http=self._http)
+
 
         # Setup Upload
         media_body = MediaFileUpload(filename, mimetype=mime_type, resumable=True)
@@ -92,21 +121,24 @@ class GoogleDriveUpload():
         # Authorize with HTTP
         self._http = self._credentials.authorize(httplib2.Http())
 
+        # Setup Service in order to upload file
+        self._service = discovery.build('drive', 'v2', http=self._http)
 
 
 def main():
     """
         Driver Program for the GoogleDriveUpload ElasticPowerTAC Plugin
     """
-    googledrive = GoogleDriveUpload('client_secrets.json','session.json')
+    googledrive = GoogleDriveAPIWrapper('client_secrets.json','session.json')
 
 
-    googledrive.insert_file(title="hello",
+    test_file = googledrive.insert_file(title="hello",
                             description="world",
                             parent_id=None,
                             mime_type="image/jpeg",
                             filename="Small_Portrait.jpg")
-       
+    if test_file:
+        googledrive.download_file(file_id=test_file['id'],file_name="hello.jpg")
  
 if __name__ == '__main__':
     main()
